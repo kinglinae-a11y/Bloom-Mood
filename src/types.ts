@@ -105,3 +105,53 @@ export interface GuidedPrompt {
   suggestedAction: string;
   affirmation: string;
 }
+
+export type HabitCategory = 'hydration' | 'sleep' | 'mindfulness' | 'movement' | 'nourishment' | 'unplug';
+
+export interface HabitItem {
+  id: string;
+  title: string;
+  category: HabitCategory;
+  description: string;
+  targetLabel: string;
+  scienceBenefit: string;
+  iconName: string;
+  type: 'checkbox' | 'counter';
+  targetCount?: number;
+  unit?: string;
+  isCustom?: boolean;
+}
+
+export interface HabitRecord {
+  completed: boolean;
+  count?: number;
+  loggedAt?: number;
+  notes?: string;
+}
+
+export interface DailyHabitLog {
+  [habitId: string]: HabitRecord;
+}
+
+export type DayOfWeek = 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun';
+
+export interface MoodReminder {
+  id: string;
+  label: string;
+  time: string; // "HH:MM" 24h format
+  enabled: boolean;
+  message: string;
+  days: DayOfWeek[];
+  lastNotifiedDate?: string; // "YYYY-MM-DD"
+}
+
+export interface ToastNotification {
+  id: string;
+  title: string;
+  message: string;
+  type?: 'reminder' | 'success' | 'info';
+  timestamp: number;
+  actionLabel?: string;
+  targetTab?: string;
+  duration?: number; // ms
+}

@@ -10,12 +10,14 @@ import {
   HelpCircle, 
   Check, 
   ArrowRight,
-  BookmarkCheck
+  BookmarkCheck,
+  Bell
 } from 'lucide-react';
 
 interface MoodCheckInProps {
   onGoToCalm: () => void;
   onSaveEntry: (entry: MoodLogEntry) => void;
+  onOpenReminders?: () => void;
 }
 
 const BODY_ZONES = [
@@ -38,7 +40,7 @@ const COMMON_TRIGGERS = [
   'Sleep Deprivation',
 ];
 
-export function MoodCheckIn({ onGoToCalm, onSaveEntry }: MoodCheckInProps) {
+export function MoodCheckIn({ onGoToCalm, onSaveEntry, onOpenReminders }: MoodCheckInProps) {
   const [selectedCategory, setSelectedCategory] = useState<EmotionCategory | 'all'>('all');
   const [selectedEmotion, setSelectedEmotion] = useState<EmotionItem>(EMOTIONS_DATA[0]);
   const [intensity, setIntensity] = useState<number>(6);
@@ -117,6 +119,15 @@ export function MoodCheckIn({ onGoToCalm, onSaveEntry }: MoodCheckInProps) {
                 <Wind className="w-4 h-4" />
                 <span>Instant Panic / Calm Room</span>
               </button>
+              {onOpenReminders && (
+                <button
+                  onClick={onOpenReminders}
+                  className="px-4 py-2.5 rounded-xl bg-stone-800/90 hover:bg-stone-700 text-emerald-300 border border-emerald-900/60 text-xs sm:text-sm font-medium flex items-center gap-2 transition-colors cursor-pointer"
+                >
+                  <Bell className="w-4 h-4 text-emerald-400" />
+                  <span>Daily Reminders</span>
+                </button>
+              )}
               <a
                 href="#decoder-step"
                 className="px-4 py-2.5 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 text-xs sm:text-sm font-medium transition-colors"

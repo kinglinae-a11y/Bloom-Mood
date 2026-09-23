@@ -9,8 +9,13 @@ import { PrivateJournal } from './components/PrivateJournal';
 import { MoodWeeklyTrends } from './components/MoodWeeklyTrends';
 import { ResourceLibrary } from './components/ResourceLibrary';
 import { GuidedJournalSection } from './components/GuidedJournalSection';
+import { HabitsTracker } from './components/HabitsTracker';
 import { CrisisModal } from './components/CrisisModal';
-import { MoodLogEntry } from './types';
+import { RemindersModal } from './components/RemindersModal';
+import { ToastNotificationContainer } from './components/ToastNotificationContainer';
+import { MoodLogEntry, MoodReminder, ToastNotification, DayOfWeek } from './types';
+import { DEFAULT_REMINDERS, playGentleReminderSound, showBrowserNativeNotification } from './utils/reminderService';
+import { formatDateKey } from './data/defaultHabits';
 import { 
   Heart, 
   Wind, 
@@ -23,12 +28,36 @@ import {
   Compass,
   Activity,
   Library,
-  PenTool
+  PenTool,
+  CheckSquare
 } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>('checkin');
   const [isCrisisModalOpen, setIsCrisisModalOpen] = useState<boolean>(false);
+  const [isRemindersModalOpen, setIsRemindersModalOpen] = useState<boolean>(false);
+  const [toasts, setToasts] = useState<ToastNotification[]>([]);
+
+  // Sound chime preference for reminders
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem('sanctuary_reminder_sound_enabled');
+      return stored !== null ? JSON.parse(stored) : true;
+    } catch {
+      return true;
+    }
+  });
+
+  // Daily mood reminders in localStorage
+  const [reminders, setReminders] = useState<MoodReminder[]>(() => {
+    try {
+      const stored = localStorage.getItem('sanctuary_mood_reminders');
+      if (stored) {
+        return JSON.parse(stored);
+      }
+    } catch {}
+    return DEFAULT_REMINDERS;
+  });
 
   // Stored mood entries in localStorage
   const [moodEntries, setMoodEntries] = useState<MoodLogEntry[]>(() => {
@@ -59,6 +88,122 @@ export default function App() {
       localStorage.setItem('sanctuary_mood_entries', JSON.stringify(moodEntries));
     } catch {}
   }, [moodEntries]);
+
+  // Persist reminders
+  useEffect(() => {
+    try {
+      localStorage.setItem('sanctuary_mood_reminders', JSON.stringify(reminders));
+    } catch {}
+  }, [reminders]);
+
+  // Persist sound preference
+  useEffect(() => {
+    try {
+      localStorage.setItem('sanctuary_reminder_sound_enabled', JSON.stringify(soundEnabled));
+    } catch {}
+  }, [soundEnabled]);
+
+  // Trigger toast & browser notification
+  const triggerReminderAlert = (reminder: MoodReminder) => {
+    if (soundEnabled) {
+      playGentleReminderSound();
+    }
+
+    showBrowserNativeNotification(
+      reminder.label,
+      reminder.message,
+      () => handleTabSelect('checkin')
+    );
+
+    setToasts(prev => [
+      ...prev,
+      {
+        id: `toast-${Date.now()}-${Math.random()}`,
+        title: reminder.label,
+        message: reminder.message,
+        type: 'reminder',
+        timestamp: Date.now(),
+        actionLabel: 'Check In Now',
+        targetTab: 'checkin',
+        duration: 9000
+      }
+    ]);
+  };
+
+  // Test notification button handler
+  const handleTriggerTestToast = () => {
+    if (soundEnabled) {
+      playGentleReminderSound();
+    }
+
+    showBrowserNativeNotification(
+      'Daily Mood Check-in Reminder',
+      'Take a slow breath. Notice how your nervous system is feeling right now.',
+      () => handleTabSelect('checkin')
+    );
+
+    setToasts(prev => [
+      ...prev,
+      {
+        id: `toast-test-${Date.now()}`,
+        title: 'Daily Mood Check-in Reminder',
+        message: 'Take a slow breath. Notice how your nervous system is feeling right now.',
+        type: 'reminder',
+        timestamp: Date.now(),
+        actionLabel: 'Check In Now',
+        targetTab: 'checkin',
+        duration: 9000
+      }
+    ]);
+  };
+
+  const handleToastAction = (toast: ToastNotification) => {
+    if (toast.targetTab) {
+      handleTabSelect(toast.targetTab);
+    }
+    handleDismissToast(toast.id);
+  };
+
+  const handleDismissToast = (id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  };
+
+  // Periodically check if any reminder matches current time
+  useEffect(() => {
+    const checkReminders = () => {
+      const now = new Date();
+      const currentHours = String(now.getHours()).padStart(2, '0');
+      const currentMinutes = String(now.getMinutes()).padStart(2, '0');
+      const currentTimeStr = `${currentHours}:${currentMinutes}`;
+      const todayKey = formatDateKey(now);
+
+      const daysArr: DayOfWeek[] = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const currentDayOfWeek = daysArr[now.getDay()];
+
+      setReminders(prevReminders => {
+        let hasChanges = false;
+        const next = prevReminders.map(reminder => {
+          if (
+            reminder.enabled &&
+            reminder.time === currentTimeStr &&
+            reminder.days.includes(currentDayOfWeek) &&
+            reminder.lastNotifiedDate !== todayKey
+          ) {
+            hasChanges = true;
+            triggerReminderAlert(reminder);
+            return { ...reminder, lastNotifiedDate: todayKey };
+          }
+          return reminder;
+        });
+
+        return hasChanges ? next : prevReminders;
+      });
+    };
+
+    checkReminders();
+    const interval = setInterval(checkReminders, 15000);
+    return () => clearInterval(interval);
+  }, [soundEnabled]);
 
   const handleSaveMoodEntry = (entry: MoodLogEntry) => {
     setMoodEntries(prev => [entry, ...prev]);
@@ -172,6 +317,8 @@ export default function App() {
         activeTab={activeTab}
         onSelectTab={handleTabSelect}
         onOpenCrisis={() => setIsCrisisModalOpen(true)}
+        onOpenReminders={() => setIsRemindersModalOpen(true)}
+        activeRemindersCount={reminders.filter(r => r.enabled).length}
       />
 
       {/* Main Content Area */}
@@ -180,11 +327,18 @@ export default function App() {
           <MoodCheckIn
             onGoToCalm={() => handleTabSelect('calm')}
             onSaveEntry={handleSaveMoodEntry}
+            onOpenReminders={() => setIsRemindersModalOpen(true)}
           />
         )}
 
         {activeTab === 'calm' && (
           <CalmRoom />
+        )}
+
+        {activeTab === 'habits' && (
+          <div className="max-w-5xl mx-auto">
+            <HabitsTracker />
+          </div>
         )}
 
         {activeTab === 'trends' && (
@@ -268,6 +422,9 @@ export default function App() {
               Educational companion and self-regulation guide. Not a substitute for licensed clinical therapy.
             </div>
             <div className="flex flex-wrap items-center gap-4">
+              <button onClick={() => handleTabSelect('habits')} className="hover:text-stone-700 transition-colors cursor-pointer">
+                Daily Habits
+              </button>
               <button onClick={() => handleTabSelect('resources')} className="hover:text-stone-700 transition-colors cursor-pointer">
                 Resource Library
               </button>
@@ -314,6 +471,16 @@ export default function App() {
         >
           <Wind className="w-4 h-4" />
           <span className="text-[10px] mt-0.5">Calm</span>
+        </button>
+
+        <button
+          onClick={() => handleTabSelect('habits')}
+          className={`flex flex-col items-center justify-center min-w-[52px] py-1 px-1 rounded-xl transition-colors cursor-pointer shrink-0 ${
+            activeTab === 'habits' ? 'text-emerald-800 font-bold' : 'text-stone-500'
+          }`}
+        >
+          <CheckSquare className="w-4 h-4" />
+          <span className="text-[10px] mt-0.5">Habits</span>
         </button>
 
         <button
@@ -391,6 +558,24 @@ export default function App() {
       <CrisisModal
         isOpen={isCrisisModalOpen}
         onClose={() => setIsCrisisModalOpen(false)}
+      />
+
+      {/* Toast Notification Container for Web Browser Alerts */}
+      <ToastNotificationContainer
+        toasts={toasts}
+        onDismiss={handleDismissToast}
+        onActionClick={handleToastAction}
+      />
+
+      {/* Daily Mood Reminders Configuration Modal */}
+      <RemindersModal
+        isOpen={isRemindersModalOpen}
+        onClose={() => setIsRemindersModalOpen(false)}
+        reminders={reminders}
+        onUpdateReminders={setReminders}
+        onTriggerTestToast={handleTriggerTestToast}
+        soundEnabled={soundEnabled}
+        onToggleSound={setSoundEnabled}
       />
 
     </div>

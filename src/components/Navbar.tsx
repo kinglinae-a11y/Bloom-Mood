@@ -1,14 +1,22 @@
 import { useState } from 'react';
-import { Volume2, VolumeX, ShieldAlert, HeartHandshake } from 'lucide-react';
+import { Volume2, VolumeX, ShieldAlert, HeartHandshake, Bell } from 'lucide-react';
 import { ambientSound } from '../utils/audioSynthesis';
 
 interface NavbarProps {
   activeTab: string;
   onSelectTab: (tab: string) => void;
   onOpenCrisis: () => void;
+  onOpenReminders?: () => void;
+  activeRemindersCount?: number;
 }
 
-export function Navbar({ activeTab, onSelectTab, onOpenCrisis }: NavbarProps) {
+export function Navbar({ 
+  activeTab, 
+  onSelectTab, 
+  onOpenCrisis, 
+  onOpenReminders,
+  activeRemindersCount = 0
+}: NavbarProps) {
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
 
   const toggleSound = () => {
@@ -19,6 +27,7 @@ export function Navbar({ activeTab, onSelectTab, onOpenCrisis }: NavbarProps) {
   const navItems = [
     { id: 'checkin', label: 'Check-in' },
     { id: 'calm', label: 'Calm Room' },
+    { id: 'habits', label: 'Habits' },
     { id: 'trends', label: 'Weekly Trends' },
     { id: 'prompts', label: 'Guided Prompts' },
     { id: 'resources', label: 'Resource Library' },
@@ -62,8 +71,23 @@ export function Navbar({ activeTab, onSelectTab, onOpenCrisis }: NavbarProps) {
           })}
         </nav>
 
-        {/* Zone 3: 1-2 primary actions */}
-        <div className="flex items-center gap-3">
+        {/* Zone 3: Actions */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          {onOpenReminders && (
+            <button
+              onClick={onOpenReminders}
+              title={`Manage Daily Mood Reminders (${activeRemindersCount} active)`}
+              className="p-2 rounded-lg border border-stone-200 bg-white hover:border-emerald-300 text-stone-600 hover:text-stone-900 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer relative"
+              aria-label="Manage daily check-in reminders"
+            >
+              <Bell className="w-4 h-4 text-emerald-700" />
+              <span className="hidden md:inline">Reminders</span>
+              {activeRemindersCount > 0 && (
+                <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse absolute -top-0.5 -right-0.5" />
+              )}
+            </button>
+          )}
+
           <button
             onClick={toggleSound}
             title={isPlayingAudio ? 'Mute 432Hz ambient sound' : 'Play calming 432Hz ambient sound'}
