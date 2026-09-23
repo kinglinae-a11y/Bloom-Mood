@@ -68,3 +68,40 @@ export interface JournalPrompt {
   category: string;
   question: string;
 }
+
+export type ResourceCategory = 'stress' | 'identity' | 'relationships' | 'adolescent_concerns';
+export type ResourceType = 'article' | 'website' | 'video';
+
+export interface ResourceItem {
+  id: string;
+  title: string;
+  summary: string;
+  category: ResourceCategory;
+  type: ResourceType;
+  source: string;
+  url: string;
+  readOrWatchTime: string;
+  keyTakeaways: string[];
+  tags: string[];
+  featuredQuote: string;
+  embedVideoId?: string; // Optional YouTube ID or preview
+  overviewDetails: string;
+}
+
+export type GuidedPromptCategory = 'self-discovery' | 'coping' | 'goals' | 'relationships' | 'challenges';
+
+export interface GuidedPrompt {
+  id: string;
+  title: string;
+  category: GuidedPromptCategory;
+  coreQuestion: string;
+  whyItMatters: string;
+  stepPrompts: {
+    step: number;
+    title: string;
+    promptText: string;
+    placeholder: string;
+  }[];
+  suggestedAction: string;
+  affirmation: string;
+}

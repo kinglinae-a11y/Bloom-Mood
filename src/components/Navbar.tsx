@@ -17,29 +17,32 @@ export function Navbar({ activeTab, onSelectTab, onOpenCrisis }: NavbarProps) {
   };
 
   const navItems = [
-    { id: 'checkin', label: 'Feelings Check-in' },
+    { id: 'checkin', label: 'Check-in' },
     { id: 'calm', label: 'Calm Room' },
+    { id: 'trends', label: 'Weekly Trends' },
+    { id: 'prompts', label: 'Guided Prompts' },
+    { id: 'resources', label: 'Resource Library' },
     { id: 'brain', label: 'Adolescent Brain' },
-    { id: 'playbooks', label: 'Life Playbooks' },
-    { id: 'untangle', label: 'Thought Untangler' },
-    { id: 'journal', label: 'Private Journal' },
+    { id: 'playbooks', label: 'Playbooks' },
+    { id: 'untangle', label: 'Untangle' },
+    { id: 'journal', label: 'Journal' },
   ];
 
   return (
     <header className="sticky top-0 z-40 bg-stone-50/90 backdrop-blur-md border-b border-stone-200/80">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
         
         {/* Zone 1: Single Brand Title */}
         <button 
           onClick={() => onSelectTab('checkin')} 
-          className="font-display text-xl font-bold text-stone-900 tracking-tight flex items-center gap-2 group text-left cursor-pointer"
+          className="font-display text-xl font-bold text-stone-900 tracking-tight flex items-center gap-2 group text-left cursor-pointer shrink-0"
         >
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 group-hover:scale-125 transition-transform" />
           <span>Sanctuary</span>
         </button>
 
-        {/* Zone 2: Clean 4-6 text navigation links */}
-        <nav className="hidden lg:flex items-center gap-7 text-sm font-medium text-stone-600">
+        {/* Zone 2: Navigation links */}
+        <nav className="hidden lg:flex items-center gap-4 xl:gap-5 text-xs xl:text-sm font-medium text-stone-600 overflow-x-auto py-1">
           {navItems.map((item) => {
             const isActive = activeTab === item.id;
             return (

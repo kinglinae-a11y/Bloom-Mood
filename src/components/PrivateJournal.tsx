@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { MoodLogEntry, JournalPrompt } from '../types';
 import { JOURNAL_PROMPTS } from '../data/adolescenceContent';
+import { MoodWeeklyTrends } from './MoodWeeklyTrends';
+import { GuidedJournalSection } from './GuidedJournalSection';
 import { 
   Lock, 
   Unlock, 
@@ -12,7 +14,10 @@ import {
   Check, 
   Clock, 
   ShieldCheck,
-  Calendar
+  Calendar,
+  Activity,
+  BookOpen,
+  PenTool
 } from 'lucide-react';
 
 interface JournalEntry {
@@ -26,9 +31,18 @@ interface JournalEntry {
 interface PrivateJournalProps {
   moodEntries: MoodLogEntry[];
   onDeleteMoodEntry: (id: string) => void;
+  onAddSampleWeek?: () => void;
+  onClearSampleData?: () => void;
 }
 
-export function PrivateJournal({ moodEntries, onDeleteMoodEntry }: PrivateJournalProps) {
+export function PrivateJournal({ 
+  moodEntries, 
+  onDeleteMoodEntry,
+  onAddSampleWeek,
+  onClearSampleData
+}: PrivateJournalProps) {
+  const [activeTab, setActiveTab] = useState<'journal' | 'guided' | 'trends'>('journal');
+
   // PIN lock system
   const [pinEnabled, setPinEnabled] = useState<boolean>(() => {
     return localStorage.getItem('sanctuary_pin_enabled') === 'true';
@@ -261,7 +275,73 @@ export function PrivateJournal({ moodEntries, onDeleteMoodEntry }: PrivateJourna
         </div>
       )}
 
-      {/* New Reflection Composer */}
+      {/* View Switcher: Journal Writer vs Guided Prompts vs Weekly Trends */}
+      <div className="flex flex-wrap items-center gap-2 p-1.5 bg-stone-200/70 rounded-2xl w-fit">
+        <button
+          onClick={() => setActiveTab('journal')}
+          className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+            activeTab === 'journal'
+              ? 'bg-white text-stone-900 shadow-xs'
+              : 'text-stone-600 hover:text-stone-900'
+          }`}
+        >
+          <BookOpen className="w-4 h-4 text-emerald-700" />
+          <span>Freewrite Journal & Prompts</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('guided')}
+          className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+            activeTab === 'guided'
+              ? 'bg-white text-stone-900 shadow-xs'
+              : 'text-stone-600 hover:text-stone-900'
+          }`}
+        >
+          <PenTool className="w-4 h-4 text-emerald-700" />
+          <span>Guided 3-Step Studio</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('trends')}
+          className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+            activeTab === 'trends'
+              ? 'bg-white text-stone-900 shadow-xs'
+              : 'text-stone-600 hover:text-stone-900'
+          }`}
+        >
+          <Activity className="w-4 h-4 text-emerald-700" />
+          <span>Weekly Trends (Recharts)</span>
+        </button>
+      </div>
+
+      {activeTab === 'trends' && (
+        <MoodWeeklyTrends
+          moodEntries={moodEntries}
+          onAddSampleWeek={onAddSampleWeek}
+          onClearSampleData={onClearSampleData}
+        />
+      )}
+
+      {activeTab === 'guided' && (
+        <GuidedJournalSection
+          onSaveToJournal={(entry) => {
+            const newEntry = {
+              id: `guided-${Date.now()}`,
+              timestamp: Date.now(),
+              promptQuestion: entry.promptQuestion,
+              content: entry.content,
+              tags: entry.tags
+            };
+            setJournalEntries(prev => [newEntry, ...prev]);
+            setActiveTab('journal');
+          }}
+          onNavigateToJournal={() => setActiveTab('journal')}
+        />
+      )}
+
+      {activeTab === 'journal' && (
+        <>
+          {/* New Reflection Composer */}
       <div className="p-6 sm:p-8 bg-white rounded-3xl border border-stone-200 shadow-xs space-y-5">
         <div className="flex items-center justify-between">
           <h3 className="font-display text-lg font-bold text-stone-900 flex items-center gap-2">
@@ -451,6 +531,8 @@ export function PrivateJournal({ moodEntries, onDeleteMoodEntry }: PrivateJourna
           </div>
         )}
       </div>
+      </>
+      )}
 
       {/* Security notice */}
       <div className="p-4 rounded-2xl bg-stone-100/70 border border-stone-200 flex items-center justify-between text-xs text-stone-500">
