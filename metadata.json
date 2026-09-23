@@ -1,0 +1,6 @@
+{
+  "name": "Sanctuary: Adolescent Emotions & Well-being Companion",
+  "description": "An empathetic, science-grounded sanctuary to help teenagers and young adults decode complex feelings, navigate adolescent changes, calm anxiety, and reflect safely.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
