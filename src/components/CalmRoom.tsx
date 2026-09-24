@@ -1,10 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
-import { Wind, Eye, Flame, RotateCcw, Volume2, VolumeX, Sparkles, Check, Play, Pause } from 'lucide-react';
+import { Wind, Eye, Flame, RotateCcw, Volume2, VolumeX, Sparkles, Check, Play, Pause, Music } from 'lucide-react';
 import { ambientSound } from '../utils/audioSynthesis';
 
 type CalmTool = 'breathing' | 'grounding' | 'vent' | 'sigh';
 
-export function CalmRoom() {
+interface CalmRoomProps {
+  onOpenMusic?: () => void;
+}
+
+export function CalmRoom({ onOpenMusic }: CalmRoomProps = {}) {
   const [activeTool, setActiveTool] = useState<CalmTool>('breathing');
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
 
@@ -97,27 +101,40 @@ export function CalmRoom() {
           </p>
         </div>
 
-        {/* Ambient sound trigger */}
-        <button
-          onClick={handleToggleSound}
-          className={`px-4 py-2 rounded-xl text-xs font-medium border flex items-center gap-2 transition-colors cursor-pointer self-start sm:self-auto ${
-            isPlayingAudio 
-              ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
-              : 'bg-white text-stone-700 border-stone-300 hover:bg-stone-50'
-          }`}
-        >
-          {isPlayingAudio ? (
-            <>
-              <Volume2 className="w-4 h-4 animate-pulse" />
-              <span>432Hz Calm Playing</span>
-            </>
-          ) : (
-            <>
-              <VolumeX className="w-4 h-4 text-stone-400" />
-              <span>Turn On Ambient Audio</span>
-            </>
+        {/* Audio triggers */}
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          {onOpenMusic && (
+            <button
+              onClick={onOpenMusic}
+              className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-stone-900 text-white hover:bg-stone-800 transition-colors flex items-center gap-2 cursor-pointer shadow-sm"
+              title="Search and listen to any song"
+            >
+              <Music className="w-4 h-4 text-emerald-400" />
+              <span>Music Lounge</span>
+            </button>
           )}
-        </button>
+
+          <button
+            onClick={handleToggleSound}
+            className={`px-3.5 py-2 rounded-xl text-xs font-medium border flex items-center gap-2 transition-colors cursor-pointer ${
+              isPlayingAudio 
+                ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                : 'bg-white text-stone-700 border-stone-300 hover:bg-stone-50'
+            }`}
+          >
+            {isPlayingAudio ? (
+              <>
+                <Volume2 className="w-4 h-4 animate-pulse" />
+                <span>432Hz Playing</span>
+              </>
+            ) : (
+              <>
+                <VolumeX className="w-4 h-4 text-stone-400" />
+                <span>Ambient Sound</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Tool Selector Buttons */}

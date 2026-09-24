@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Navbar } from './components/Navbar';
 import { MoodCheckIn } from './components/MoodCheckIn';
 import { CalmRoom } from './components/CalmRoom';
@@ -13,8 +13,18 @@ import { HabitsTracker } from './components/HabitsTracker';
 import { CrisisModal } from './components/CrisisModal';
 import { RemindersModal } from './components/RemindersModal';
 import { ToastNotificationContainer } from './components/ToastNotificationContainer';
-import { MoodLogEntry, MoodReminder, ToastNotification, DayOfWeek } from './types';
+import { GlobalMusicBar } from './components/GlobalMusicBar';
+import { MusicLoungeModal } from './components/MusicLoungeModal';
+import { AudioRecorderModal } from './components/AudioRecorderModal';
+import { useAuth } from './context/AuthContext';
+import { 
+  syncMoodEntryToFirestore, 
+  removeMoodEntryFromFirestore, 
+  subscribeUserMoodEntries 
+} from './utils/firestoreService';
+import { MoodLogEntry, MoodReminder, ToastNotification, DayOfWeek, Song } from './types';
 import { DEFAULT_REMINDERS, playGentleReminderSound, showBrowserNativeNotification } from './utils/reminderService';
+import { CURATED_TRACKS } from './utils/musicService';
 import { formatDateKey } from './data/defaultHabits';
 import { 
   Heart, 
@@ -29,13 +39,16 @@ import {
   Activity,
   Library,
   PenTool,
-  CheckSquare
+  CheckSquare,
+  Music
 } from 'lucide-react';
 
 export default function App() {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<string>('checkin');
   const [isCrisisModalOpen, setIsCrisisModalOpen] = useState<boolean>(false);
   const [isRemindersModalOpen, setIsRemindersModalOpen] = useState<boolean>(false);
+  const [isGlobalVoiceModalOpen, setIsGlobalVoiceModalOpen] = useState<boolean>(false);
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
 
   // Sound chime preference for reminders
@@ -47,6 +60,43 @@ export default function App() {
       return true;
     }
   });
+
+  // Music Player Persistent State
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [currentSong, setCurrentSong] = useState<Song | null>(() => {
+    return CURATED_TRACKS[0] || null;
+  });
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [progress, setProgress] = useState<number>(0);
+  const [duration, setDuration] = useState<number>(CURATED_TRACKS[0]?.duration || 147);
+  const [volume, setVolume] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('sanctuary_music_volume');
+      return saved !== null ? parseFloat(saved) : 0.8;
+    } catch {
+      return 0.8;
+    }
+  });
+  const [isMuted, setIsMuted] = useState<boolean>(false);
+  const [isLooping, setIsLooping] = useState<boolean>(false);
+  const [isMusicModalOpen, setIsMusicModalOpen] = useState<boolean>(false);
+
+  // Custom added or uploaded tracks
+  const [customSongs, setCustomSongs] = useState<Song[]>(() => {
+    try {
+      const saved = localStorage.getItem('sanctuary_custom_songs');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Save custom songs
+  useEffect(() => {
+    try {
+      localStorage.setItem('sanctuary_custom_songs', JSON.stringify(customSongs));
+    } catch {}
+  }, [customSongs]);
 
   // Daily mood reminders in localStorage
   const [reminders, setReminders] = useState<MoodReminder[]>(() => {
@@ -88,6 +138,21 @@ export default function App() {
       localStorage.setItem('sanctuary_mood_entries', JSON.stringify(moodEntries));
     } catch {}
   }, [moodEntries]);
+
+  // Sync with Firestore when user is authenticated
+  useEffect(() => {
+    if (!user) return;
+    const unsubscribe = subscribeUserMoodEntries(user.uid, (cloudEntries) => {
+      if (cloudEntries && cloudEntries.length > 0) {
+        setMoodEntries(prev => {
+          const cloudIds = new Set(cloudEntries.map(e => e.id));
+          const localOnly = prev.filter(p => !cloudIds.has(p.id) && !p.id.startsWith('sample-'));
+          return [...cloudEntries, ...localOnly];
+        });
+      }
+    });
+    return () => unsubscribe();
+  }, [user]);
 
   // Persist reminders
   useEffect(() => {
@@ -205,12 +270,22 @@ export default function App() {
     return () => clearInterval(interval);
   }, [soundEnabled]);
 
-  const handleSaveMoodEntry = (entry: MoodLogEntry) => {
+  const handleSaveMoodEntry = async (entry: MoodLogEntry) => {
     setMoodEntries(prev => [entry, ...prev]);
+    if (user) {
+      await syncMoodEntryToFirestore(user.uid, entry).catch(err => {
+        console.error('Failed to sync mood entry to Firestore:', err);
+      });
+    }
   };
 
-  const handleDeleteMoodEntry = (id: string) => {
+  const handleDeleteMoodEntry = async (id: string) => {
     setMoodEntries(prev => prev.filter(e => e.id !== id));
+    if (user) {
+      await removeMoodEntryFromFirestore(user.uid, id).catch(err => {
+        console.error('Failed to remove mood entry from Firestore:', err);
+      });
+    }
   };
 
   const handleAddSampleWeek = () => {
@@ -303,6 +378,159 @@ export default function App() {
     setMoodEntries(prev => prev.filter(p => !p.id.startsWith('sample-')));
   };
 
+  // Audio Playback Handlers
+  const allTracks = [...customSongs, ...CURATED_TRACKS];
+
+  const handlePlaySong = (song: Song) => {
+    setCurrentSong(song);
+    setIsPlaying(true);
+    setProgress(0);
+    setDuration(song.duration || 180);
+
+    if (song.audioUrl) {
+      if (audioRef.current) {
+        audioRef.current.src = song.audioUrl;
+        audioRef.current.currentTime = 0;
+        audioRef.current.volume = isMuted ? 0 : volume;
+        audioRef.current.play().catch(e => {
+          console.warn('Audio play request interrupted or blocked:', e);
+        });
+      }
+    } else if (song.youtubeId) {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+    }
+  };
+
+  const handleTogglePlay = () => {
+    if (!currentSong) {
+      if (CURATED_TRACKS.length > 0) {
+        handlePlaySong(CURATED_TRACKS[0]);
+      }
+      return;
+    }
+
+    if (isPlaying) {
+      if (audioRef.current) audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      if (currentSong.audioUrl && audioRef.current) {
+        audioRef.current.play().catch(e => console.warn('Audio play failed:', e));
+      }
+      setIsPlaying(true);
+    }
+  };
+
+  const handleSeek = (newSeconds: number) => {
+    setProgress(newSeconds);
+    if (audioRef.current && currentSong?.audioUrl) {
+      audioRef.current.currentTime = newSeconds;
+    }
+  };
+
+  const handleChangeVolume = (newVol: number) => {
+    setVolume(newVol);
+    setIsMuted(false);
+    if (audioRef.current) {
+      audioRef.current.volume = newVol;
+    }
+    try {
+      localStorage.setItem('sanctuary_music_volume', String(newVol));
+    } catch {}
+  };
+
+  const handleToggleMute = () => {
+    const nextMuted = !isMuted;
+    setIsMuted(nextMuted);
+    if (audioRef.current) {
+      audioRef.current.volume = nextMuted ? 0 : volume;
+    }
+  };
+
+  const handleToggleLoop = () => {
+    setIsLooping(prev => !prev);
+  };
+
+  const handleNextSong = () => {
+    if (!currentSong) {
+      handlePlaySong(CURATED_TRACKS[0]);
+      return;
+    }
+    const currentIndex = allTracks.findIndex(s => s.id === currentSong.id);
+    const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % allTracks.length : 0;
+    handlePlaySong(allTracks[nextIndex]);
+  };
+
+  const handlePrevSong = () => {
+    if (!currentSong) {
+      handlePlaySong(CURATED_TRACKS[0]);
+      return;
+    }
+    const currentIndex = allTracks.findIndex(s => s.id === currentSong.id);
+    const prevIndex = currentIndex > 0 ? currentIndex - 1 : allTracks.length - 1;
+    handlePlaySong(allTracks[prevIndex]);
+  };
+
+  const handleAddCustomSong = (song: Song) => {
+    setCustomSongs(prev => [song, ...prev.filter(s => s.id !== song.id)]);
+  };
+
+  // HTML5 Audio element listeners
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const onTimeUpdate = () => {
+      setProgress(audio.currentTime);
+    };
+
+    const onLoadedMetadata = () => {
+      if (audio.duration && !isNaN(audio.duration) && audio.duration > 0) {
+        setDuration(audio.duration);
+      }
+    };
+
+    const onEnded = () => {
+      if (isLooping) {
+        audio.currentTime = 0;
+        audio.play().catch(() => {});
+      } else {
+        handleNextSong();
+      }
+    };
+
+    audio.addEventListener('timeupdate', onTimeUpdate);
+    audio.addEventListener('loadedmetadata', onLoadedMetadata);
+    audio.addEventListener('ended', onEnded);
+
+    return () => {
+      audio.removeEventListener('timeupdate', onTimeUpdate);
+      audio.removeEventListener('loadedmetadata', onLoadedMetadata);
+      audio.removeEventListener('ended', onEnded);
+    };
+  }, [isLooping, currentSong, customSongs]);
+
+  // YouTube duration tracking when active
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    if (isPlaying && currentSong?.youtubeId) {
+      interval = setInterval(() => {
+        setProgress(p => {
+          if (p >= (currentSong.duration || 240)) {
+            if (isLooping) return 0;
+            handleNextSong();
+            return 0;
+          }
+          return p + 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isPlaying, currentSong, isLooping]);
+
   // Scroll to top on tab change
   const handleTabSelect = (tab: string) => {
     setActiveTab(tab);
@@ -319,10 +547,14 @@ export default function App() {
         onOpenCrisis={() => setIsCrisisModalOpen(true)}
         onOpenReminders={() => setIsRemindersModalOpen(true)}
         activeRemindersCount={reminders.filter(r => r.enabled).length}
+        onOpenMusic={() => setIsMusicModalOpen(true)}
+        isMusicPlaying={isPlaying}
+        currentSongTitle={currentSong?.title}
+        onOpenVoiceModal={() => setIsGlobalVoiceModalOpen(true)}
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-8 pb-24 md:pb-12">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-8 pb-36 lg:pb-28">
         {activeTab === 'checkin' && (
           <MoodCheckIn
             onGoToCalm={() => handleTabSelect('calm')}
@@ -332,7 +564,7 @@ export default function App() {
         )}
 
         {activeTab === 'calm' && (
-          <CalmRoom />
+          <CalmRoom onOpenMusic={() => setIsMusicModalOpen(true)} />
         )}
 
         {activeTab === 'habits' && (
@@ -552,7 +784,59 @@ export default function App() {
           <Lock className="w-4 h-4" />
           <span className="text-[10px] mt-0.5">Journal</span>
         </button>
+
+        <button
+          onClick={() => setIsMusicModalOpen(true)}
+          className={`flex flex-col items-center justify-center min-w-[52px] py-1 px-1 rounded-xl transition-colors cursor-pointer shrink-0 ${
+            isPlaying ? 'text-emerald-700 font-bold' : 'text-stone-500'
+          }`}
+        >
+          <Music className={`w-4 h-4 ${isPlaying ? 'animate-bounce text-emerald-600' : ''}`} />
+          <span className="text-[10px] mt-0.5">Music</span>
+        </button>
       </nav>
+
+      {/* Hidden Global Audio Element */}
+      <audio
+        ref={audioRef}
+        preload="auto"
+        className="hidden"
+      />
+
+      {/* Global Bottom Music Player Bar */}
+      <GlobalMusicBar
+        currentSong={currentSong}
+        isPlaying={isPlaying}
+        progress={progress}
+        duration={duration}
+        volume={volume}
+        isMuted={isMuted}
+        isLooping={isLooping}
+        onTogglePlay={handleTogglePlay}
+        onSeek={handleSeek}
+        onChangeVolume={handleChangeVolume}
+        onToggleMute={handleToggleMute}
+        onToggleLoop={handleToggleLoop}
+        onNext={handleNextSong}
+        onPrev={handlePrevSong}
+        onOpenLounge={() => setIsMusicModalOpen(true)}
+        onTimeUpdate={(sec) => setProgress(sec)}
+        onDurationUpdate={(dur) => setDuration(dur)}
+        onEnded={handleNextSong}
+        onPlayerStateChange={(playing) => setIsPlaying(playing)}
+      />
+
+      {/* Full Music Lounge & Discovery Modal */}
+      <MusicLoungeModal
+        isOpen={isMusicModalOpen}
+        onClose={() => setIsMusicModalOpen(false)}
+        currentSong={currentSong}
+        isPlaying={isPlaying}
+        onPlaySong={handlePlaySong}
+        onTogglePlay={handleTogglePlay}
+        customSongs={customSongs}
+        onAddCustomSong={handleAddCustomSong}
+      />
 
       {/* Confidential Crisis Modal */}
       <CrisisModal
@@ -576,6 +860,29 @@ export default function App() {
         onTriggerTestToast={handleTriggerTestToast}
         soundEnabled={soundEnabled}
         onToggleSound={setSoundEnabled}
+      />
+
+      {/* Global Voice Note / Audio Transcription Modal */}
+      <AudioRecorderModal
+        isOpen={isGlobalVoiceModalOpen}
+        onClose={() => setIsGlobalVoiceModalOpen(false)}
+        onTranscriptComplete={(transcript) => {
+          setActiveTab('journal');
+          setToasts(prev => [
+            ...prev,
+            {
+              id: `toast-transcribed-${Date.now()}`,
+              title: 'Audio Transcribed Successfully',
+              message: `Voice transcribed with Gemini 3.5 Transcribe. Opened in Journal.`,
+              type: 'reminder',
+              timestamp: Date.now(),
+              actionLabel: 'View Journal',
+              targetTab: 'journal',
+              duration: 7000
+            }
+          ]);
+        }}
+        initialContext="Voice Memo"
       />
 
     </div>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { EMOTIONS_DATA } from '../data/adolescenceContent';
 import { EmotionItem, EmotionCategory, MoodLogEntry } from '../types';
+import { AudioRecorderModal } from './AudioRecorderModal';
 import { 
   Heart, 
   Sparkles, 
@@ -11,7 +12,8 @@ import {
   Check, 
   ArrowRight,
   BookmarkCheck,
-  Bell
+  Bell,
+  Mic
 } from 'lucide-react';
 
 interface MoodCheckInProps {
@@ -48,6 +50,7 @@ export function MoodCheckIn({ onGoToCalm, onSaveEntry, onOpenReminders }: MoodCh
   const [selectedTriggers, setSelectedTriggers] = useState<string[]>(['School & Grades']);
   const [personalNote, setPersonalNote] = useState<string>('');
   const [isSavedRecently, setIsSavedRecently] = useState(false);
+  const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
 
   const filteredEmotions = selectedCategory === 'all' 
     ? EMOTIONS_DATA 
@@ -343,14 +346,25 @@ export function MoodCheckIn({ onGoToCalm, onSaveEntry, onOpenReminders }: MoodCh
             </div>
 
             <div className="mt-5 space-y-2">
-              <label htmlFor="checkin-notes" className="text-xs font-bold text-stone-700">
-                Optional note or unedited thought:
-              </label>
+              <div className="flex items-center justify-between">
+                <label htmlFor="checkin-notes" className="text-xs font-bold text-stone-700">
+                  Optional note or unedited thought:
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setIsVoiceModalOpen(true)}
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 hover:text-emerald-900 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200 transition-colors cursor-pointer"
+                  title="Speak your note and transcribe with Gemini 3.5"
+                >
+                  <Mic className="w-3 h-3 text-emerald-600" />
+                  <span>Dictate Note</span>
+                </button>
+              </div>
               <textarea
                 id="checkin-notes"
                 value={personalNote}
                 onChange={(e) => setPersonalNote(e.target.value)}
-                placeholder="What happened? E.g., 'Group chat got quiet after I sent a meme and my brain convinced me everyone hates me...'"
+                placeholder="What happened? Click 'Dictate Note' or type freely..."
                 rows={3}
                 className="w-full text-xs p-3 rounded-xl border border-stone-200 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 bg-stone-50/50 resize-none text-stone-800"
               />
@@ -414,6 +428,15 @@ export function MoodCheckIn({ onGoToCalm, onSaveEntry, onOpenReminders }: MoodCh
         </div>
       </section>
 
+      {/* Voice Dictation Modal */}
+      <AudioRecorderModal
+        isOpen={isVoiceModalOpen}
+        onClose={() => setIsVoiceModalOpen(false)}
+        onTranscriptComplete={(transcript) => {
+          setPersonalNote(prev => prev.trim() ? `${prev} ${transcript}` : transcript);
+        }}
+        initialContext="Mood Check-in"
+      />
     </div>
   );
 }

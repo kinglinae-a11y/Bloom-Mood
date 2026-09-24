@@ -155,3 +155,22 @@ export interface ToastNotification {
   targetTab?: string;
   duration?: number; // ms
 }
+
+export type SongSource = 'search' | 'curated' | 'youtube' | 'custom' | 'upload';
+
+export interface Song {
+  id: string;
+  title: string;
+  artist: string;
+  album?: string;
+  artwork: string;
+  audioUrl?: string; // Direct audio stream / preview url / object url
+  youtubeId?: string; // YouTube video ID if playing via YouTube
+  duration: number; // in seconds (exact recorded time)
+  genre?: string;
+  source: SongSource;
+  releaseYear?: string;
+  isFullLength?: boolean; // True when full-length real song is verified
+  viewCount?: string;
+  channelTitle?: string;
+}

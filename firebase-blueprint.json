@@ -1,0 +1,209 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "User unique ID",
+          "maxLength": 128
+        },
+        "email": {
+          "type": "string",
+          "description": "User email address",
+          "maxLength": 256
+        },
+        "displayName": {
+          "type": "string",
+          "description": "User display name",
+          "maxLength": 128
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "User avatar URL",
+          "maxLength": 1024
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when user was created"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when user was last updated"
+        }
+      },
+      "required": ["uid", "email"]
+    },
+    "MoodEntry": {
+      "title": "MoodEntry",
+      "description": "Adolescent mood check-in log entry",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique entry identifier",
+          "maxLength": 128
+        },
+        "userId": {
+          "type": "string",
+          "description": "UID of the user who owns this entry",
+          "maxLength": 128
+        },
+        "timestamp": {
+          "type": "number",
+          "description": "Epoch timestamp in milliseconds"
+        },
+        "emotionId": {
+          "type": "string",
+          "description": "Identifier of the emotion",
+          "maxLength": 128
+        },
+        "emotionName": {
+          "type": "string",
+          "description": "Human-readable emotion name",
+          "maxLength": 128
+        },
+        "category": {
+          "type": "string",
+          "description": "Emotion category",
+          "maxLength": 64
+        },
+        "intensity": {
+          "type": "number",
+          "description": "Emotion intensity rating 1-10"
+        },
+        "bodyLocations": {
+          "type": "array",
+          "description": "List of physical body sensation areas"
+        },
+        "triggers": {
+          "type": "array",
+          "description": "Identified triggers"
+        },
+        "notes": {
+          "type": "string",
+          "description": "User reflective notes or observations",
+          "maxLength": 4000
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp of record creation"
+        }
+      },
+      "required": ["id", "userId", "timestamp", "emotionId", "emotionName", "category", "intensity"]
+    },
+    "JournalEntry": {
+      "title": "JournalEntry",
+      "description": "Private reflective journal entry, optionally transcribed from voice",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique journal entry identifier",
+          "maxLength": 128
+        },
+        "userId": {
+          "type": "string",
+          "description": "UID of the owner",
+          "maxLength": 128
+        },
+        "timestamp": {
+          "type": "number",
+          "description": "Epoch timestamp in milliseconds"
+        },
+        "promptQuestion": {
+          "type": "string",
+          "description": "Optional guided prompt question answered",
+          "maxLength": 512
+        },
+        "content": {
+          "type": "string",
+          "description": "The text content of the journal or voice transcription",
+          "maxLength": 20000
+        },
+        "tags": {
+          "type": "array",
+          "description": "Category tags for the entry"
+        },
+        "isAudioTranscribed": {
+          "type": "boolean",
+          "description": "Whether this entry was recorded via mic and transcribed"
+        },
+        "audioDurationSeconds": {
+          "type": "number",
+          "description": "Duration of recorded audio in seconds if transcribed"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp of creation"
+        }
+      },
+      "required": ["id", "userId", "timestamp", "content"]
+    },
+    "VoiceNote": {
+      "title": "VoiceNote",
+      "description": "Voice recording audio memo transcribed with Gemini 3.5 Transcribe",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique voice note identifier",
+          "maxLength": 128
+        },
+        "userId": {
+          "type": "string",
+          "description": "UID of the user",
+          "maxLength": 128
+        },
+        "timestamp": {
+          "type": "number",
+          "description": "Epoch timestamp in milliseconds"
+        },
+        "title": {
+          "type": "string",
+          "description": "Title or summary of the voice note",
+          "maxLength": 256
+        },
+        "transcript": {
+          "type": "string",
+          "description": "Accurate transcription generated by gemini-3.5-transcribe",
+          "maxLength": 20000
+        },
+        "durationSeconds": {
+          "type": "number",
+          "description": "Duration in seconds"
+        },
+        "category": {
+          "type": "string",
+          "description": "Voice note category or emotion tag",
+          "maxLength": 64
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        }
+      },
+      "required": ["id", "userId", "timestamp", "transcript"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile document"
+    },
+    "/users/{userId}/moodEntries/{entryId}": {
+      "schema": "MoodEntry",
+      "description": "Individual mood tracking entries for the user"
+    },
+    "/users/{userId}/journalEntries/{entryId}": {
+      "schema": "JournalEntry",
+      "description": "Private journal entries and transcribed reflections"
+    },
+    "/users/{userId}/voiceNotes/{noteId}": {
+      "schema": "VoiceNote",
+      "description": "Transcribed audio voice notes for the user"
+    }
+  }
+}
